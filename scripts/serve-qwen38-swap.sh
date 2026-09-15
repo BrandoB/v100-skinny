@@ -16,10 +16,14 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PORT="${1:?usage: $0 <port> [served-model-name]}"
-# Served name = llama-swap entry key (vLLM enforces the match). 2nd arg lets one
-# wrapper back several entries (s359: qwen3.8-27b-skinny-mns4 = MNS=4 MBT=8192 via env:).
-SERVED_NAME="${2:-${SERVED_NAME:-qwen3.8-27b-skinny}}"
+PORT="${1:?usage: $0 <port> [served-model-name ...]}"
+shift
+# Served names = every arg after the port (vLLM accepts a list). The first must be
+# the llama-swap entry key; the rest are llama-swap ALIASES of that entry — llama-swap
+# resolves an alias to the entry but forwards the request body's model field
+# unchanged, so vLLM must also answer to the alias (s359: qwen3.8-27b-stock is the
+# deep-think slot name the Jarvis riders call).
+if [ "$#" -gt 0 ]; then SERVED_NAMES=("$@"); else SERVED_NAMES=(${SERVED_NAME:-qwen3.8-27b-skinny}); fi
 CKPT="${CKPT:-/mnt/models/RadixArk-Qwen3.8-27B-NVFP4}"
 PY="$REPO_ROOT/.venv-sm70/bin/python"
 GPUS="${CUDA_VISIBLE_DEVICES:-2,3}"
@@ -79,7 +83,7 @@ export HF_HUB_OFFLINE=1
 
 $NUMA_PREFIX "$PY" -m vllm.entrypoints.openai.api_server \
   --model "$CKPT" \
-  --served-model-name "$SERVED_NAME" \
+  --served-model-name "${SERVED_NAMES[@]}" \
   --trust-remote-code \
   --dtype float16 \
   --attention-backend FLASH_ATTN_V100 \
