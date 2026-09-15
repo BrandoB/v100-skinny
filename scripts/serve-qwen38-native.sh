@@ -72,9 +72,15 @@ esac
 GMU="${GMU:-0.88}"
 MML="${MML:-32768}"
 MNS="${MNS:-1}"
+# MNS-aware CUDA-graph capture sizes (s358): [K1,K2] at MNS<=2, K1*1..MNS above.
+# LOCKSTEP with serve-qwen38-swap.sh.
+CAPS=$(seq -s, "$K1" "$K1" $((K1 * ( MNS > 2 ? MNS : 2 ))))
 MBT="${MBT:-4096}"
 PORT="${PORT:-8000}"
 THINKING="${THINKING:-true}"
+# Template default reasoning effort: low|medium|xhigh. The template's own default
+# is xhigh, which runs away in-thinking on long agentic tasks; low is act-first.
+REASONING_EFFORT="${REASONING_EFFORT:-xhigh}"
 # Pin the decode partition size. The default selector switches to 1024 at
 # max_model_len >= 32768, and the MTP verify path (which arrives as q>1) has
 # no active-partition skip, so a large MML taxes every round for capacity it
@@ -84,7 +90,7 @@ DECODE_PARTITION="${DECODE_PARTITION:-256}"
 LOG="${LOG:-$REPO_ROOT/serve.log}"
 
 # ---- 1. never boot over occupied GPUs ------------------------------------
-USED=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits | sort -n | tail -1)
+USED=$(nvidia-smi -i "${CUDA_VISIBLE_DEVICES:-0,1,2,3}" --query-gpu=memory.used --format=csv,noheader,nounits | sort -n | tail -1)
 if [ "${USED:-0}" -ge 200 ]; then
   echo "ABORT: GPUs are occupied (${USED} MiB in use). Finish the teardown first." >&2
   nvidia-smi --query-compute-apps=pid,used_memory --format=csv >&2
@@ -119,9 +125,11 @@ trap 'cleanup_on_fail' INT TERM
 
 rm -f "$LOG"
 echo "==> serving $CKPT  (k=$K, GMU=$GMU, MML=$MML, partition=$DECODE_PARTITION)"
+# Telemetry opt-out (vLLM usage stats + HF hub UA) — LOCKSTEP with serve-qwen38-swap.sh.
 
 CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3}" \
 CUDA_HOME="${CUDA_HOME:-/usr/local/cuda-12.8}" \
+CPATH="$REPO_ROOT/.venv-sm70/lib/python3.12/site-packages/nvidia/cusparse/include:$REPO_ROOT/.venv-sm70/lib/python3.12/site-packages/nvidia/cublas/include:$REPO_ROOT/.venv-sm70/lib/python3.12/site-packages/nvidia/cusolver/include:$REPO_ROOT/.venv-sm70/lib/python3.12/site-packages/nvidia/curand/include:$REPO_ROOT/.venv-sm70/lib/python3.12/site-packages/nvidia/cufft/include${CPATH:+:$CPATH}" \
 TORCH_CUDA_ARCH_LIST=7.0 \
 VLLM_SM70_NVFP4_TURBOMIND=0 \
 VLLM_SM70_QUANT_BACKEND=marlin \
@@ -137,22 +145,26 @@ VLLM_SM70_MTP_DYNAMIC_DRAFT_VOCAB_DEFAULT=0 \
 VLLM_SM70_GDN_CHAIN_SPEC_FAST_BUILD=1 \
 VLLM_SM70_QPN8_MT2=1 \
 VLLM_FLASH_V100_DECODE_PARTITION_SIZE="$DECODE_PARTITION" \
+VLLM_NO_USAGE_STATS=1 \
+DO_NOT_TRACK=1 \
+HF_HUB_DISABLE_TELEMETRY=1 \
+HF_HUB_OFFLINE=1 \
 setsid $NUMA_PREFIX "$PY" -m vllm.entrypoints.openai.api_server \
   --model "$CKPT" \
   --served-model-name qwen3.8-27b \
   --trust-remote-code \
   --dtype float16 \
   --attention-backend FLASH_ATTN_V100 \
-  --tensor-parallel-size 4 \
+  --tensor-parallel-size "${TP:-4}" \
   --gpu-memory-utilization "$GMU" \
   --max-model-len "$MML" \
   --max-num-seqs "$MNS" \
   --max-num-batched-tokens "$MBT" \
   --limit-mm-per-prompt '{"image":0,"video":0}' \
-  --default-chat-template-kwargs "{\"enable_thinking\":$THINKING}" \
+  --default-chat-template-kwargs "{\"enable_thinking\":$THINKING,\"reasoning_effort\":\"$REASONING_EFFORT\"}" \
   --reasoning-parser qwen3 \
-  --enable-auto-tool-choice --tool-call-parser hermes \
-  --compilation-config "{\"cudagraph_capture_sizes\":[$K1,$K2]}" \
+  --enable-auto-tool-choice --tool-call-parser qwen3_coder \
+  --compilation-config "{\"cudagraph_capture_sizes\":[$CAPS]}" \
   --speculative-config "{\"method\":\"mtp\",\"num_speculative_tokens\":$K,\"draft_sample_method\":\"greedy\",\"use_local_argmax_reduction\":true}" \
   --host "$HOST" --port "$PORT" > "$LOG" 2>&1 < /dev/null &
 SERVER_PID=$!
@@ -255,7 +267,7 @@ INELIGIBLE=$(grep -c "QPN8_CENSUS_LOAD.*eligible=NO" "$LOG" || true)
 # The launch claim is an EXACT number: 2 protected modules per layer x 64
 # layers x 4 ranks = 512. "Any positive count" would pass a boot that silently
 # dropped modules, which is the failure this gate exists to catch.
-CENSUS_EXPECTED=$((128 * 4))
+CENSUS_EXPECTED=$((128 * ${TP:-4}))
 [ "${CENSUS:-0}" = "$CENSUS_EXPECTED" ] && [ "${INELIGIBLE:-0}" = 0 ] \
   && gate "QPN8 census exactly $CENSUS_EXPECTED, 0 ineligible" ok \
   || gate "QPN8 census exactly $CENSUS_EXPECTED" fail "census=$CENSUS ineligible=$INELIGIBLE"
