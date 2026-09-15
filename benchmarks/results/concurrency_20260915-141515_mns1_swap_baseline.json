@@ -1,0 +1,72 @@
+{
+ "ts": "20260915-141515_mns1_swap_baseline",
+ "base": "http://127.0.0.1:8082",
+ "model": "qwen3.8-27b-skinny",
+ "max_tokens": 512,
+ "thinking": false,
+ "rounds": [
+  {
+   "streams": 1,
+   "wall_s": 184.58,
+   "errors": 0,
+   "aggregate_tok_s": 2.8,
+   "per_stream_decode_tok_s": [
+    72.7
+   ],
+   "per_stream_mean": 72.7,
+   "ttft_s": [
+    177.557
+   ],
+   "usage_exact": true,
+   "spec": {},
+   "streams_detail": [
+    {
+     "stream": 0,
+     "ttft_s": 177.557,
+     "wall_s": 184.58,
+     "completion_tokens": 512,
+     "usage_exact": true,
+     "decode_tok_s": 72.7,
+     "error": null
+    }
+   ]
+  },
+  {
+   "streams": 2,
+   "wall_s": 14.3,
+   "errors": 0,
+   "aggregate_tok_s": 71.6,
+   "per_stream_decode_tok_s": [
+    74.6,
+    74.5
+   ],
+   "per_stream_mean": 74.5,
+   "ttft_s": [
+    0.304,
+    7.448
+   ],
+   "usage_exact": true,
+   "spec": {},
+   "streams_detail": [
+    {
+     "stream": 0,
+     "ttft_s": 0.304,
+     "wall_s": 7.15,
+     "completion_tokens": 512,
+     "usage_exact": true,
+     "decode_tok_s": 74.6,
+     "error": null
+    },
+    {
+     "stream": 1,
+     "ttft_s": 7.448,
+     "wall_s": 14.3,
+     "completion_tokens": 512,
+     "usage_exact": true,
+     "decode_tok_s": 74.5,
+     "error": null
+    }
+   ]
+  }
+ ]
+}

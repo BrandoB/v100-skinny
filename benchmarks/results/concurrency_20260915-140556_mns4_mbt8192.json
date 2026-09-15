@@ -1,0 +1,149 @@
+{
+ "ts": "20260915-140556_mns4_mbt8192",
+ "base": "http://127.0.0.1:8096",
+ "model": "qwen3.8-27b",
+ "max_tokens": 512,
+ "thinking": false,
+ "rounds": [
+  {
+   "streams": 1,
+   "wall_s": 7.18,
+   "errors": 0,
+   "aggregate_tok_s": 71.3,
+   "per_stream_decode_tok_s": [
+    74.1
+   ],
+   "per_stream_mean": 74.1,
+   "ttft_s": [
+    0.289
+   ],
+   "usage_exact": true,
+   "spec": {
+    "drafts": 157.0,
+    "draft_tokens": 1099.0,
+    "accepted": 355.0,
+    "accept_rate": 0.323,
+    "accepted_per_draft": 2.26
+   },
+   "streams_detail": [
+    {
+     "stream": 0,
+     "ttft_s": 0.289,
+     "wall_s": 7.18,
+     "completion_tokens": 512,
+     "usage_exact": true,
+     "decode_tok_s": 74.1,
+     "error": null
+    }
+   ]
+  },
+  {
+   "streams": 2,
+   "wall_s": 11.62,
+   "errors": 0,
+   "aggregate_tok_s": 88.2,
+   "per_stream_decode_tok_s": [
+    48.6,
+    48.6
+   ],
+   "per_stream_mean": 48.6,
+   "ttft_s": [
+    1.09,
+    1.09
+   ],
+   "usage_exact": true,
+   "spec": {
+    "drafts": 314.0,
+    "draft_tokens": 2198.0,
+    "accepted": 710.0,
+    "accept_rate": 0.323,
+    "accepted_per_draft": 2.26
+   },
+   "streams_detail": [
+    {
+     "stream": 0,
+     "ttft_s": 1.09,
+     "wall_s": 11.61,
+     "completion_tokens": 512,
+     "usage_exact": true,
+     "decode_tok_s": 48.6,
+     "error": null
+    },
+    {
+     "stream": 1,
+     "ttft_s": 1.09,
+     "wall_s": 11.61,
+     "completion_tokens": 512,
+     "usage_exact": true,
+     "decode_tok_s": 48.6,
+     "error": null
+    }
+   ]
+  },
+  {
+   "streams": 4,
+   "wall_s": 17.65,
+   "errors": 0,
+   "aggregate_tok_s": 116.1,
+   "per_stream_decode_tok_s": [
+    29.9,
+    29.9,
+    29.9,
+    29.9
+   ],
+   "per_stream_mean": 29.9,
+   "ttft_s": [
+    0.529,
+    0.528,
+    0.528,
+    0.528
+   ],
+   "usage_exact": true,
+   "spec": {
+    "drafts": 628.0,
+    "draft_tokens": 4396.0,
+    "accepted": 1420.0,
+    "accept_rate": 0.323,
+    "accepted_per_draft": 2.26
+   },
+   "streams_detail": [
+    {
+     "stream": 0,
+     "ttft_s": 0.529,
+     "wall_s": 17.65,
+     "completion_tokens": 512,
+     "usage_exact": true,
+     "decode_tok_s": 29.9,
+     "error": null
+    },
+    {
+     "stream": 1,
+     "ttft_s": 0.528,
+     "wall_s": 17.64,
+     "completion_tokens": 512,
+     "usage_exact": true,
+     "decode_tok_s": 29.9,
+     "error": null
+    },
+    {
+     "stream": 2,
+     "ttft_s": 0.528,
+     "wall_s": 17.64,
+     "completion_tokens": 512,
+     "usage_exact": true,
+     "decode_tok_s": 29.9,
+     "error": null
+    },
+    {
+     "stream": 3,
+     "ttft_s": 0.528,
+     "wall_s": 17.64,
+     "completion_tokens": 512,
+     "usage_exact": true,
+     "decode_tok_s": 29.9,
+     "error": null
+    }
+   ]
+  }
+ ]
+}

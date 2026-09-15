@@ -1,0 +1,41 @@
+{
+ "ts": "20260914-235204_smoke",
+ "base": "http://127.0.0.1:8082",
+ "model": "qwen3.8-27b-skinny",
+ "max_tokens": 64,
+ "thinking": false,
+ "rounds": [
+  {
+   "streams": 1,
+   "wall_s": 2.53,
+   "errors": 0,
+   "aggregate_tok_s": 25.3,
+   "per_stream_decode_tok_s": [
+    42.6
+   ],
+   "per_stream_mean": 42.6,
+   "ttft_s": [
+    1.045
+   ],
+   "usage_exact": true,
+   "spec": {
+    "drafts": 21.0,
+    "draft_tokens": 147.0,
+    "accepted": 44.0,
+    "accept_rate": 0.299,
+    "accepted_per_draft": 2.1
+   },
+   "streams_detail": [
+    {
+     "stream": 0,
+     "ttft_s": 1.045,
+     "wall_s": 2.52,
+     "completion_tokens": 64,
+     "usage_exact": true,
+     "decode_tok_s": 42.6,
+     "error": null
+    }
+   ]
+  }
+ ]
+}
