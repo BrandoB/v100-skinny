@@ -100,9 +100,11 @@ fi
 # NUMA pin is part of the launch config, not an optimisation: all four GPUs
 # sit on socket 0 and an unpinned boot re-rolls thread/page placement for a
 # +/-3% round-time lottery -- larger than the entire parity margin we report.
-# SKINNY_NUMA=0 disables it for experiments.
+# SKINNY_NUMA=0 disables it for experiments. NUMA_NODE (default 0) picks the guest node for the
+# Stage 0 node-1 arm; VM101 pins guest memory to host sockets but not vCPUs, so node 1 moves memory
+# locality only. LOCKSTEP: serve-qwen38-swap.sh keeps its own node-0 pin and does not read NUMA_NODE.
 if [ "${SKINNY_NUMA:-1}" = "1" ] && command -v numactl >/dev/null; then
-  NUMA_PREFIX="numactl --cpunodebind=0 --membind=0"
+  NUMA_PREFIX="numactl --cpunodebind=${NUMA_NODE:-0} --membind=${NUMA_NODE:-0}"
 else
   NUMA_PREFIX=""
   [ "${SKINNY_NUMA:-1}" = "1" ] && echo "WARNING: numactl not found; boots will vary ~3% run to run" >&2

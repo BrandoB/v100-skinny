@@ -1,0 +1,1 @@
+Write a detailed, step-by-step explanation of how a four-stroke engine works, then list ten common failure modes with a one-line cause each. Be thorough and keep going until you reach the token limit.
