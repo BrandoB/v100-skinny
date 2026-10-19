@@ -14,6 +14,12 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PORT="${1:?usage: $0 <port> <served-model-name> [alias ...]}"; shift
 [ "$#" -gt 0 ] || { echo "usage: $0 <port> <served-model-name> [alias ...]" >&2; exit 2; }
 SERVED_NAMES=("$@")
+# Guest NUMA node for numactl --cpunodebind/--membind. Default 0 = the old skinny pin. GPUs 2,3 sit on HOST socket 1;
+# guest node 1 is host node 1 only once VM101's vCPUs are pinned per node (sigsec ops/llama-cpp-pin/vm101-40vcpu/).
+# Brandon 2026-10-18: production entry sets NUMA_NODE=1.
+NUMA_NODE="${NUMA_NODE:-0}"
+[[ "$NUMA_NODE" =~ ^[0-9]+$ ]] && [ -d "/sys/devices/system/node/node$NUMA_NODE" ] \
+  || { echo "ERROR: NUMA_NODE=$NUMA_NODE is not a guest NUMA node" >&2; exit 2; }
 ENV_PREFIX="${ENV_PREFIX:-/mnt/bulk/sigsec-scratch/.venv-1cat151}"
 PY="$ENV_PREFIX/bin/python"
 CKPT="${CKPT:-/mnt/models/RadixArk-Qwen3.8-27B-NVFP4-BF16-LMHead}"
@@ -35,7 +41,7 @@ ARGS=("${BASE[@]}" --port "$PORT" --tensor-parallel-size "${TP:-2}" --served-mod
   --max-num-seqs "${MNS:-4}" --max-num-batched-tokens "${MBT:-8192}"
   --default-chat-template-kwargs "{\"enable_thinking\":${THINKING:-true},\"reasoning_effort\":\"${REASONING_EFFORT:-low}\"}"
   --speculative-config "$SPEC")
-NUMA=(); command -v numactl >/dev/null && NUMA=(numactl --cpunodebind=0 --membind=0)
+NUMA=(); command -v numactl >/dev/null && NUMA=(numactl --cpunodebind="$NUMA_NODE" --membind="$NUMA_NODE")
 
 env -i HOME="$HOME" USER="${USER:-brand}" PATH="$ENV_PREFIX/bin:/usr/local/cuda-12.8/bin:/usr/bin:/bin" \
   CUDA_HOME=/usr/local/cuda-12.8 CUDA_VISIBLE_DEVICES="$GPUS" HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 \
