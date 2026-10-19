@@ -16,7 +16,8 @@ case "$WIN" in
   A) EST_MIN=150 ;;   # 13 sweeps, baseline first and last
   B) EST_MIN=150 ;;   # 7 sweeps + 2 long-context arms
   D) EST_MIN=120 ;;   # skinny base -> stock 1Cat 1.5.1 MTP -> 1.5.1 DFlash2 -> skinny base, each + llama-benchy
-  *) echo "usage: $0 A|B|D" >&2; exit 2 ;;
+  Q) EST_MIN=60 ;;    # production-switch quality gate on stock 1.5.1 + DFlash2 (benchmarks/quality_gate.py)
+  *) echo "usage: $0 A|B|D|Q" >&2; exit 2 ;;
 esac
 # Night mode (Brandon's per-night go): NIGHT_OK=<YYYY-MM-DD the night starts> moves the deadline from 21:00 to
 # 06:30 next morning. The fan guard below is what bounds noise at night (Brandon 2026-10-17: fans may not sit
@@ -77,8 +78,9 @@ else
 fi
 [ $(( $(date +%s) + EST_MIN * 60 )) -le "$DEADLINE" ] \
   || { log "REFUSE window $WIN: ~${EST_MIN} min from now runs past the $(date -d @"$DEADLINE" +%H:%M) deadline (the closing baseline would be lost)"; exit 1; }
-[ "$WIN" = D ] && { [ -d "$STOCK_CKPT" ] && [ -x /mnt/bulk/sigsec-scratch/.venv-1cat151/bin/python ] && [ -x /mnt/bulk/sigsec-scratch/.venv-benchy040/bin/llama-benchy ] \
-  || { log "REFUSE window D: stock checkpoint, 1.5.1 env or benchy env missing"; exit 1; }; }
+{ [ "$WIN" = D ] || [ "$WIN" = Q ]; } && { [ -d "$STOCK_CKPT" ] && [ -x /mnt/bulk/sigsec-scratch/.venv-1cat151/bin/python ] && [ -x /mnt/bulk/sigsec-scratch/.venv-benchy040/bin/llama-benchy ] \
+  || { log "REFUSE window $WIN: stock checkpoint, 1.5.1 env or benchy env missing"; exit 1; }; }
+[ "$WIN" = Q ] && { [ -s "$RES/quality-skinny_prod.json" ] || { log "REFUSE window Q: skinny gate (quality-skinny_prod.json) not finished — stopping llama-swap would kill it"; exit 1; }; }
 P=$(cat serve.pid 2>/dev/null)
 if [ -n "$P" ]; then
   is_vllm "$P" && { log "HARD STOP: a manual :8096 lane is already running (pid $P)"; exit 1; }
@@ -153,7 +155,7 @@ fan_watch() { # background: chassis fan PWM (iDRAC Oem.Dell.FanPWM) every 30 s -
 STARTED=1
 touch /tmp/flex_watchdog.pause; systemctl --user stop flex-watchdog.timer llama-swap
 log "WINDOW $WIN START $(date -Is)"
-{ [ -n "${NIGHT_OK:-}" ] || [ "$WIN" = D ]; } && { fan_watch & FANW=$!; }   # A/B by day unchanged
+{ [ -n "${NIGHT_OK:-}" ] || [ "$WIN" = D ] || [ "$WIN" = Q ]; } && { fan_watch & FANW=$!; }   # A/B by day unchanged
 
 guard() {
   local row pl dl PLS
@@ -227,8 +229,14 @@ stock() { # stock TAG VAR=val ...  stock 1Cat 1.5.1 lane (scripts/serve-1cat-sto
   if run env LOG="$PWD/$RES/$T.serve.log" CUDA_VISIBLE_DEVICES=2,3 PORT=8096 TP=2 GMU=0.85 MML=204800 KV=fp8_e4m3 "$@" \
        bash scripts/serve-1cat-stock.sh "$STOCK_CKPT" >> "$RES/$T.wrapper.log" 2>&1; then
     witness "$@"
-    client "$T"; alive_or_exit
-    benchy "$T"; alive_or_exit
+    if [ "$WIN" = Q ]; then   # same suite skinny ran live on :8082 (quality-skinny_prod.json)
+      run timeout -s TERM 3600 /mnt/bulk/sigsec-scratch/.venv-benchy040/bin/python -I benchmarks/quality_gate.py \
+        http://127.0.0.1:8096 qwen3.8-27b "$T" >> "$RES/$T.quality.log" 2>&1 || log "quality rc=$? for $T"
+      alive_or_exit
+    else
+      client "$T"; alive_or_exit
+      benchy "$T"; alive_or_exit
+    fi
   else log "GATE FAIL $T"; echo "GATE FAIL $T" >> "$RES/failures.txt"; rc=1; fi
   stop_arm
   return $rc
@@ -259,6 +267,8 @@ elif [ "$WIN" = D ]; then        # stock 1Cat 1.5.1 (BF16-LMHead ckpt, fp8_e4m3 
   fi
   stock x151_dflash2_k7 ARM=dflash2 K=7
   sweep base_k7_end K=7 DECODE_PARTITION=1024 $B
+elif [ "$WIN" = Q ]; then        # production-switch quality gate: stock 1.5.1 + DFlash2, the config the swap wrapper runs
+  stock x151_dflash2_q ARM=dflash2 K=7
 else                             # P=512, NUMA arms, AR fusion, AR timing, long context
   for KK in 3 7; do sweep "k${KK}_p512" K=$KK DECODE_PARTITION=512 $B; done
   sweep numa_off_k7_p1024 K=7 DECODE_PARTITION=1024 SKINNY_NUMA=0 $B
